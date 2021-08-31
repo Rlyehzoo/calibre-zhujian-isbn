@@ -1,5 +1,5 @@
-NAME=douban
-SRC=douban
+NAME=zhujian
+SRC=zhujian
 ZIP=$(NAME).zip
 SRC_FILES=__init__.py
 
@@ -12,7 +12,7 @@ install: $(ZIP)
 	calibre-customize -a $(ZIP)
 
 test: install
-	calibre-debug -e $(SRC)/douban.py
+	calibre-debug -e $(SRC)/__init__.py
 
 clean:
 	rm -f $(ZIP)

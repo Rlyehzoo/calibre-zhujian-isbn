@@ -25,15 +25,15 @@ NAMESPACES = {
 }
 
 
-class Douban(Source):
+class zhujian(Source):
 
-    name = "Douban Books Reload"
-    author = "Li Fanxi, xcffl, jnozsc"
-    version = (4, 0, 0)
-    minimum_calibre_version = (2, 80, 0)
+    name = "Zhujian isbn"
+    author = "Rlyehzoo"
+    version = (1, 0, 0)
+    minimum_calibre_version = (1, 0, 0)
 
     description = _(
-        "Downloads metadata and covers from Douban.com. "
+        "metadata download based on https://github.com/qiaohaoforever/DoubanBook"
         "Useful only for Chinese language books."
     )
 
@@ -42,7 +42,6 @@ class Douban(Source):
         [
             "title",
             "authors",
-            "tags",
             "pubdate",
             "comments",
             "publisher",
@@ -66,28 +65,46 @@ class Douban(Source):
             _("Whether to append subtitle in the book title."),
         ),
         Option(
-            "apikey", "string", "", _("douban api v2 apikey"), _("douban api v2 apikey")
+            "apikey", "string", "", _("zhujian api apikey"), _("zhujian api apikey")
         ),
     )
 
     def to_metadata(self, browser, log, entry_, timeout):  # {{{
         from calibre.utils.date import parse_date, utcnow
+        import re
 
-        douban_id = entry_.get("id")
+        douban_url = entry_.get("url")
+        douban_id = str(re.search("\d+",douban_url).group())
         title = entry_.get("title")
-        description = entry_.get("summary")
+        description = entry_.get("book_intro")
         # subtitle = entry_.get('subtitle')  # TODO: std metada doesn't have this field
-        publisher = entry_.get("publisher")
-        isbn = entry_.get("isbn13")  # ISBN11 is obsolute, use ISBN13
-        pubdate = entry_.get("pubdate")
-        authors = entry_.get("author")
-        book_tags = entry_.get("tags")
-        rating = entry_.get("rating")
-        cover_url = entry_.get("images", {}).get("large")
-        series = entry_.get("series")
+        isbn = entry_.get("isbn")  # ISBN11 is obsolute, use ISBN13
+        cover_url = entry_.get("cover_url")
+        publisher = None
+        pubdate = None
+        authors = None
+        if "book_info" in entry_:
+            book_info = entry_["book_info"]
+            publisher = book_info["出版社"]
+            pubdate = book_info["出版年"]
+            authors = book_info["作者"]
+        elif "abstract" in entry_:
+            book_info = entry_["abstract"]
+            info = book_info.split('/')
+            authors = info[0:-3].trim()
+            pubdate = info[-1].trim()
+            publisher = info[-2].trim()
+        
+        rating = None
+        if "rating" in entry_:
+            doubanrating = entry_["rating"]
+            rating = doubanrating["value"]
+
 
         if not authors:
             authors = [_("Unknown")]
+        else:
+            authors=[authors]
         if not douban_id or not title:
             # Silently discard this entry
             return None
@@ -111,9 +128,6 @@ class Douban(Source):
             mi.isbn = sorted(isbns, key=len)[-1]
         mi.all_isbns = isbns
 
-        # Tags
-        mi.tags = [tag["name"] for tag in book_tags]
-
         # pubdate
         if pubdate:
             try:
@@ -125,7 +139,7 @@ class Douban(Source):
         # Ratings
         if rating:
             try:
-                mi.rating = float(rating["average"]) / 2.0
+                mi.rating = rating / 2.0
             except:
                 log.exception("Failed to parse rating")
                 mi.rating = 0
@@ -137,10 +151,6 @@ class Douban(Source):
             # If URL contains "book-default", the book doesn't have a cover
             if u.find("book-default") == -1:
                 mi.has_douban_cover = u
-
-        # Series
-        if series:
-            mi.series = series["title"]
 
         return mi
 
@@ -158,9 +168,7 @@ class Douban(Source):
             from urllib.parse import urlencode
         except ImportError:
             from urllib import urlencode
-        SEARCH_URL = "https://api.douban.com/v2/book/search?count=10&"
-        ISBN_URL = "https://api.douban.com/v2/book/isbn/"
-        SUBJECT_URL = "https://api.douban.com/v2/book/"
+        ISBN_URL = "https://api.feelyou.top/isbn/"
 
         q = ""
         t = None
@@ -169,10 +177,9 @@ class Douban(Source):
         if isbn is not None:
             q = isbn
             t = "isbn"
-        elif subject is not None:
-            q = subject
-            t = "subject"
-        elif title or authors:
+        else :
+            log.error("no isbn")
+
 
             def build_term(prefix, parts):
                 return " ".join(x for x in parts)
@@ -195,19 +202,11 @@ class Douban(Source):
         url = None
         if t == "isbn":
             url = ISBN_URL + q
-        elif t == "subject":
-            url = SUBJECT_URL + q
-        else:
-            url = SEARCH_URL + urlencode(
-                {
-                    "q": q,
-                }
-            )
-        if self.prefs.get("apikey"):
-            if t == "isbn" or t == "subject":
-                url = url + "?apikey=" + self.prefs["apikey"]
-            else:
-                url = url + "&apikey=" + self.prefs["apikey"]
+        #if self.prefs.get("apikey"):
+        #    if t == "isbn" or t == "subject":
+        #        url = url + "?apikey=" + self.prefs["apikey"]
+        #    else:
+        #        url = url + "&apikey=" + self.prefs["apikey"]
         return url
 
     # }}}
@@ -279,22 +278,19 @@ class Douban(Source):
     # }}}
 
     def get_all_details(self, br, log, entries, abort, result_queue, timeout):  # {{{
-        for relevance, i in enumerate(entries):
-            try:
-                ans = self.to_metadata(br, log, i, timeout)
-                if isinstance(ans, Metadata):
-                    ans.source_relevance = relevance
-                    db = ans.identifiers["douban"]
-                    for isbn in getattr(ans, "all_isbns", []):
-                        self.cache_isbn_to_identifier(isbn, db)
-                    if ans.has_douban_cover:
-                        self.cache_identifier_to_cover_url(db, ans.has_douban_cover)
-                    self.clean_downloaded_metadata(ans)
-                    result_queue.put(ans)
-            except:
-                log.exception("Failed to get metadata for identify entry:", i)
-            if abort.is_set():
-                break
+        try:
+            ans = self.to_metadata(br, log, entries, timeout)
+            if isinstance(ans, Metadata):
+                ans.source_relevance = 0
+                db = ans.identifiers["douban"]
+                for isbn in getattr(ans, "all_isbns", []):
+                    self.cache_isbn_to_identifier(isbn, db)
+                if ans.has_douban_cover:
+                    self.cache_identifier_to_cover_url(db, ans.has_douban_cover)
+                self.clean_downloaded_metadata(ans)
+                result_queue.put(ans)
+        except:
+            log.exception("Failed to get metadata for identify entry:", entries)
 
     # }}}
 
@@ -322,6 +318,10 @@ class Douban(Source):
             log.error("Insufficient metadata to construct query")
             return
         br = self.browser
+        br.addheaders = [
+            ('apikey', self.prefs["apikey"]),
+        ]
+        log('apikey is ',self.prefs["apikey"])
         try:
             raw = br.open_novisit(query, timeout=timeout).read()
         except Exception as e:
@@ -332,8 +332,8 @@ class Douban(Source):
         except Exception as e:
             log.exception("Failed to parse identify results")
             return as_unicode(e)
-        if "books" in j:
-            entries = j["books"]
+        if j is not None:
+            entries = j
         else:
             entries = []
             entries.append(j)
@@ -359,20 +359,14 @@ if __name__ == "__main__":  # tests {{{
     )
 
     test_identify_plugin(
-        Douban.name,
+        zhujian.name,
         [
             (
                 {
-                    "identifiers": {"isbn": "9787536692930"},
-                    "title": "三体",
-                    "authors": ["刘慈欣"],
+                    "identifiers": {"isbn": "9787506380263"},
                 },
-                [title_test("三体", exact=True), authors_test(["刘慈欣"])],
-            ),
-            (
-                {"title": "Linux内核修炼之道", "authors": ["任桥伟"]},
-                [title_test("Linux内核修炼之道", exact=False)],
-            ),
+                [title_test("人间失格", exact=True), authors_test(["太宰治"])],
+            )
         ],
     )
 # }}}
