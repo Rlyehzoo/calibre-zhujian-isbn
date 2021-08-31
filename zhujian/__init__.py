@@ -229,7 +229,7 @@ def get_isbns(browser, log, entry_,timeout):  # {{{
 
 class GoogleBooks(Source):
 
-    name = "Zhujian isbn v1.1.0"
+    name = "Zhujian isbn"
     author = "Rlyehzoo"
     version = (1, 1, 0)
     minimum_calibre_version = (1, 0, 0)
@@ -287,6 +287,8 @@ class GoogleBooks(Source):
             q = isbn
             t = "isbn"
         elif title or authors:
+
+            authors = None
 
             def build_term(prefix, parts):
                 return ' '.join('in' + prefix + ':' + x for x in parts)
