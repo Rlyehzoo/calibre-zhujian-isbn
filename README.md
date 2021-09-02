@@ -1,7 +1,3 @@
-# About this project
-
-[`Calibre`](https://github.com/kovidgoyal/calibre) used to offer an official douban plugin to fetch the book metadata from douban.com. However, the author of `Calibre` chooses to not maintain it any more. So I decide to maintain my own branch.
-
 # DISCLAIMER
 
 In order to work functionally, this project requires a valid API key. The project itself does not provide any API key and does not recommend to share any API key in any method. See https://github.com/qiaohaoforever/DoubanBook.git to obtain apikeys.
