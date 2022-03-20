@@ -2,7 +2,7 @@
 
 In order to work functionally, this project requires a valid API key. The project itself does not provide any API key and does not recommend to share any API key in any method. See https://github.com/qiaohaoforever/DoubanBook.git to obtain apikeys.
 
-为了正常工作，本项目需要有效的 API 密钥。本项目不提供任何 API 密钥，也不建议以任何方法共享任何 API 密钥。请参阅https://github.com/qiaohaoforever/DoubanBook.git获得授权访问。
+为了正常工作，本项目需要有效的 API 密钥。本项目不提供任何 API 密钥，也不建议以任何方法共享任何 API 密钥。请参阅https://github.com/qiaohaoforever/DoubanBook.git 获得授权访问。
 
 # How to install
 
